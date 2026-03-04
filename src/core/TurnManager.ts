@@ -6,10 +6,21 @@ export class TurnManager {
     private players: Map<string, Player> = new Map();
     private gameManager: GameManager;
     private devilManager: DevilManager;
+    private turnNumber: number = 1;
 
     constructor(gameManager: GameManager, devilManager: DevilManager) {
         this.gameManager = gameManager;
         this.devilManager = devilManager;
+    }
+
+    public getTurnNumber() {
+        return this.turnNumber;
+    }
+
+    public getPendingPlayers(): string[] {
+        return Array.from(this.players.values())
+            .filter(p => p.isAlive && !p.hasMoved)
+            .map(p => p.name);
     }
 
     public addPlayer(player: Player) {
@@ -20,6 +31,9 @@ export class TurnManager {
     public submitMove(playerId: string, targetPos: { x: number, y: number }) {
         const player = this.players.get(playerId);
         if (player && player.isAlive && !player.hasMoved) {
+            targetPos.x = player.pos.x + targetPos.x;
+            targetPos.y = player.pos.y + targetPos.y;
+            console.log(`Player ${player.name} move from (${player.pos.x}, ${player.pos.y}) to (${targetPos.x}, ${targetPos.y})`);
             player.pendingMove = targetPos;
             player.hasMoved = true;
         }
@@ -50,30 +64,38 @@ export class TurnManager {
 
         // 3. เช็กผลลัพธ์หลังเดินเสร็จ
         const results = alivePlayers.map(player => {
-            // เช็กตาย (ชนปีศาจ) [00:05:51]
+            if (!player.pos) {
+                console.error(`Player ${player.name} has no position!`);
+                return { playerId: player.id, status: 'ERROR' };
+            }
+
+            // เช็กตาย (ชนปีศาจ) 
             if (this.gameManager.checkPlayerDeath(player.pos, devilPos)) {
                 player.isAlive = false;
                 return { playerId: player.id, status: 'DIED', pos: player.pos };
             }
 
-            // เช็กเสียงกึกกัก (ปีศาจอยู่ใกล้ 8 ทิศ) [00:07:00]
+            // เช็กเสียงกึกกัก (ปีศาจอยู่ใกล้ 8 ทิศ)
             const heardNoise = this.gameManager.checkProximity(player.pos, devilPos);
 
-            // เช็กการเจอเพื่อน (จ๊ะเอ๋กัน) [00:04:24]
+            // เช็กการเจอเพื่อน (จ๊ะเอ๋กัน)
             const metPlayers = alivePlayers
                 .filter(other => other.id !== player.id && other.pos.x === player.pos.x && other.pos.y === player.pos.y)
                 .map(other => other.name);
+
+            const roomNo = this.gameManager.getRoomNumber(player.pos.x, player.pos.y);
 
             return {
                 playerId: player.id,
                 status: 'ALIVE',
                 pos: player.pos,
-                roomNumber: this.gameManager.getRoomNumber(player.pos.x, player.pos.y),
+                roomNumber: roomNo,
                 heardNoise,
                 metPlayers
             };
         });
 
+        this.turnNumber++;
         return { results, devilPos };
     }
 }

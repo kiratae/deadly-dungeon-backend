@@ -61,6 +61,14 @@ export class GameManager {
     }
 
     public getRoomNumber(x: number, y: number): number {
-        return this.map[y][x].id;
+        // ตรวจสอบก่อนว่าพิกัดอยู่ในขอบเขต 0-5 หรือไม่
+        if (y >= 0 && y < 6 && x >= 0 && x < 6) {
+            const row = this.map[y]; // แถวคือ y
+            if (row && row[x]) {
+                return row[x].id;
+            }
+        }
+        console.error(`❌ Invalid Coordinate: x=${x}, y=${y}`);
+        return 0; // คืนค่า default ถ้าหาไม่เจอ
     }
 }

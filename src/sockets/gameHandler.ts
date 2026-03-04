@@ -17,13 +17,35 @@ export const registerGameHandlers = (io: Server, socket: Socket) => {
         room.turnManager = new TurnManager(room.gameManager, room.devilManager);
         room.gameStarted = true;
 
+        const spawnPoints: { x: number, y: number }[] = [];
+        for (let y = 0; y < 6; y++) {
+            for (let x = 0; x < 6; x++) {
+                if (!room.map[y][x].isAnswerRoom && !room.map[y][x].isBlocked) {
+                    spawnPoints.push({ x, y });
+                }
+            }
+        }
+
+        for (let i = spawnPoints.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [spawnPoints[i], spawnPoints[j]] = [spawnPoints[j], spawnPoints[i]];
+        }
+
+        const alivePlayerNames = Array.from(room.players.values())
+            .filter(p => p.isAlive)
+            .map(p => p.name);
+
+        let i = 0;
         room.players.forEach((player) => {
+            player.pos = spawnPoints[i++];
             room.turnManager.addPlayer(player);
             const startRoom = room.map[player.pos.y][player.pos.x];
+
             io.to(player.id).emit('game_started', {
-                yourPos: player.pos,
                 roomNumber: startRoom.id,
-                doors: startRoom.doors
+                doors: startRoom.doors,
+                turnNumber: 1,
+                pendingPlayers: alivePlayerNames
             });
         });
     });
@@ -33,9 +55,27 @@ export const registerGameHandlers = (io: Server, socket: Socket) => {
         if (!room || !room.turnManager) return;
 
         const isReady = room.turnManager.submitMove(socket.id, targetPos);
+
         if (isReady) {
+            // 🏁 ทุกคนเดินครบ -> ประมวลผล
             const turnData = room.turnManager.processTurn();
-            turnData.results.forEach((res: any) => io.to(res.playerId).emit('turn_result', res));
+            const currentTurn = room.turnManager.getTurnNumber();
+
+            const nextTurnPending = room.turnManager.getPendingPlayers();
+
+            turnData.results.forEach((res: any) => {
+                io.to(res.playerId).emit('turn_result', {
+                    ...res,
+                    turnNumber: currentTurn,
+                    pendingPlayers: nextTurnPending
+                });
+            });
+        } else {
+            // ⏳ ยังเดินไม่ครบ -> ส่งรายชื่อคนที่เหลือให้ทุกคนดู
+            const pending = room.turnManager.getPendingPlayers();
+            io.to(roomId).emit('waiting_update', {
+                pendingPlayers: pending
+            });
         }
     });
 };

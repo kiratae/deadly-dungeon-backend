@@ -7,6 +7,7 @@ export interface Room {
     y: number;
     doors: { [key in Direction]: boolean };
     isAnswerRoom: boolean;
+    isBlocked: boolean;
     item: {
         type: ItemType;
         isCollected: boolean;

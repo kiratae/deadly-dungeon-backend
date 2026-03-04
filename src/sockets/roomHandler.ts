@@ -24,7 +24,7 @@ export const registerRoomHandlers = (io: Server, socket: Socket) => {
         socket.join(roomId);
 
         console.log(`🏠 Room Created: ${roomId} by ${playerName}`);
-        socket.emit('room_created', { roomId, hostId: socket.id });
+        socket.emit('room_created', { roomId, hostId: socket.id, playerName: playerName });
     });
 
     // จอยห้อง
@@ -43,6 +43,11 @@ export const registerRoomHandlers = (io: Server, socket: Socket) => {
 
         room.players.set(socket.id, newPlayer);
         socket.join(roomId.toUpperCase());
-        io.to(roomId.toUpperCase()).emit('player_joined', Array.from(room.players.values()));
+
+        io.to(roomId.toUpperCase()).emit('room_update', {
+            players: Array.from(room.players.values()),
+            hostId: room.hostId,
+            roomId: room.roomId
+        });
     });
 };

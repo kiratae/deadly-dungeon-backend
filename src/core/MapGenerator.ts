@@ -22,6 +22,7 @@ export class MapGenerator {
                     x, y,
                     doors: { N: false, E: false, S: false, W: false },
                     isAnswerRoom: false,
+                    isBlocked: false,
                     item: { type: this.randomItemType(), isCollected: false } // สุ่มใส่ไอเทมลงไปเลย
                 };
             }
@@ -33,6 +34,8 @@ export class MapGenerator {
         const randomY = Math.floor(Math.random() * 6);
         const randomX = Math.floor(Math.random() * 6);
         grid[randomY][randomX].isAnswerRoom = true;
+
+        // 5. สุ่มห้องบล็อก (Blocked Room) ที่ไม่ใช่ห้องตอบคำถาม
 
         return grid;
     }
