@@ -1,0 +1,1 @@
+export type ItemType = 'REVIVE' | 'TRAP' | 'MOVE_X2' | 'SCANNER' | null;

@@ -1,0 +1,14 @@
+{
+  // Visit https://aka.ms/tsconfig to read more about this file
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "NodeNext",           // แก้เป็น NodeNext
+    "moduleResolution": "NodeNext", // แก้เป็น NodeNext
+    "esModuleInterop": true,
+    "verbatimModuleSyntax": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "skipLibCheck": true
+  }
+}
