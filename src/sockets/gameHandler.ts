@@ -78,4 +78,25 @@ export const registerGameHandlers = (io: Server, socket: Socket) => {
             });
         }
     });
+
+    socket.on('send_proximity_msg', ({ roomId, message }) => {
+        const room = allRooms.get(roomId);
+        const sender = room?.players.get(socket.id);
+
+        if (room && sender) {
+            // 🔍 หาเพื่อนคนอื่นที่อยู่พิกัดเดียวกัน
+            const peopleInRoom = Array.from(room.players.values()).filter(
+                p => p.pos.x === sender.pos.x && p.pos.y === sender.pos.y
+            );
+
+            // 📢 ส่งข้อความหาทุกคนในกลุ่มนั้น (รวมตัวเอง)
+            peopleInRoom.forEach(p => {
+                io.to(p.id).emit('receive_proximity_msg', {
+                    senderName: sender.name,
+                    message: message,
+                    time: new Date().toLocaleTimeString()
+                });
+            });
+        }
+    });
 };
