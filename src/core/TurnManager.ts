@@ -28,13 +28,18 @@ export class TurnManager {
     }
 
     // รับคำสั่งเดินจากผู้เล่น [00:04:18]
-    public submitMove(playerId: string, targetPos: { x: number, y: number }) {
+    public submitMove(playerId: string, direction: string): boolean {
         const player = this.players.get(playerId);
         if (player && player.isAlive && !player.hasMoved) {
-            targetPos.x = player.pos.x + targetPos.x;
-            targetPos.y = player.pos.y + targetPos.y;
-            console.log(`Player ${player.name} move from (${player.pos.x}, ${player.pos.y}) to (${targetPos.x}, ${targetPos.y})`);
-            player.pendingMove = targetPos;
+
+            const nextPos = { ...player.pos };
+            if (direction === "N") nextPos.y--;
+            if (direction === "S") nextPos.y++;
+            if (direction === "E") nextPos.x++;
+            if (direction === "W") nextPos.x--;
+
+            console.log(`Player ${player.name} move from (${player.pos.x}, ${player.pos.y}) to (${nextPos.x}, ${nextPos.y})`);
+            player.pendingMove = nextPos;
             player.hasMoved = true;
         }
         return this.isTurnReady();

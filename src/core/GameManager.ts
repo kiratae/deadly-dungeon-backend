@@ -71,4 +71,12 @@ export class GameManager {
         console.error(`❌ Invalid Coordinate: x=${x}, y=${y}`);
         return 0; // คืนค่า default ถ้าหาไม่เจอ
     }
+
+    public verifyMap(submittedMap: number[]): boolean {
+        // ดึงเลข id ทั้งหมดจาก grid 6x6 ออกมาเป็น Array เส้นตรงเพื่อเทียบ
+        const actualMapIds = this.map.flat().map(room => room.id);
+
+        // ตรวจสอบว่าทุกตำแหน่งตรงกันเป๊ะหรือไม่
+        return submittedMap.every((id, index) => id === actualMapIds[index]);
+    }
 }

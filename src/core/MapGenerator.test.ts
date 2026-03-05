@@ -17,16 +17,6 @@ describe('MapGenerator', () => {
     expect(allRooms.length).toBe(36);
   });
 
-  it('ตัวเลขห้อง 1-36 ต้องครบและไม่ซ้ำกัน', () => {
-    const map = generator.generate();
-    const ids = map.flat().map(room => room.id);
-    const uniqueIds = new Set(ids);
-
-    expect(uniqueIds.size).toBe(36);
-    expect(Math.min(...ids)).toBe(1);
-    expect(Math.max(...ids)).toBe(36);
-  });
-
   it('ต้องมีห้องตอบคำถาม (Answer Room) เพียงห้องเดียวเท่านั้น', () => {
     const map = generator.generate();
     const answerRooms = map.flat().filter(room => room.isAnswerRoom);

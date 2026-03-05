@@ -5,6 +5,8 @@ import { GameManager } from '../core/GameManager.js';
 import { DevilManager } from '../core/DevilManager.js';
 import { TurnManager } from '../core/TurnManager.js';
 
+const readyPlayers = new Map<string, Set<string>>();
+
 export const registerGameHandlers = (io: Server, socket: Socket) => {
 
     socket.on('start_game', (roomId: string) => {
@@ -18,8 +20,8 @@ export const registerGameHandlers = (io: Server, socket: Socket) => {
         room.gameStarted = true;
 
         const spawnPoints: { x: number, y: number }[] = [];
-        for (let y = 0; y < 6; y++) {
-            for (let x = 0; x < 6; x++) {
+        for (let y = 0; y < room.map.length; y++) {
+            for (let x = 0; x < room.map[y].length; x++) {
                 if (!room.map[y][x].isAnswerRoom && !room.map[y][x].isBlocked) {
                     spawnPoints.push({ x, y });
                 }
@@ -50,11 +52,22 @@ export const registerGameHandlers = (io: Server, socket: Socket) => {
         });
     });
 
-    socket.on('player_move', ({ roomId, targetPos }) => {
+    socket.on('player_move', ({ roomId, direction }) => {
         const room = allRooms.get(roomId);
         if (!room || !room.turnManager) return;
+        const sender = room?.players.get(socket.id);
 
-        const isReady = room.turnManager.submitMove(socket.id, targetPos);
+        const isReady = room.turnManager.submitMove(socket.id, direction);
+
+        if (sender && sender.hasMoved && sender.pendingMove) {
+            const nextRoom = room.map[sender.pendingMove.y][sender.pendingMove.x];
+            io.to(socket.id).emit('move_result', {
+                nextRoom: nextRoom.id,
+                doors: nextRoom.doors,
+                item: nextRoom.item.type,
+                isAnswerRoom: nextRoom.isAnswerRoom
+            });
+        }
 
         if (isReady) {
             // 🏁 ทุกคนเดินครบ -> ประมวลผล
@@ -67,7 +80,8 @@ export const registerGameHandlers = (io: Server, socket: Socket) => {
                 io.to(res.playerId).emit('turn_result', {
                     ...res,
                     turnNumber: currentTurn,
-                    pendingPlayers: nextTurnPending
+                    pendingPlayers: nextTurnPending,
+                    turnProcessed: true
                 });
             });
         } else {
@@ -96,6 +110,71 @@ export const registerGameHandlers = (io: Server, socket: Socket) => {
                     message: message,
                     time: new Date().toLocaleTimeString()
                 });
+            });
+        }
+    });
+
+    socket.on("submit_final_map", ({ roomId, submittedMap }) => {
+        const room = allRooms.get(roomId);
+        if (!room || !room.gameManager) return;
+
+        const isCorrect = room.gameManager.verifyMap(submittedMap);
+
+        if (isCorrect) {
+            // 🏆 ประกาศผู้ชนะให้ทุกคนในห้องรู้
+            const winner = room.players.get(socket.id);
+            io.to(roomId).emit("game_over", {
+                status: "WIN",
+                winnerName: winner?.name,
+                message: `${winner?.name} คือผู้รอดชีวิตที่แท้จริง! รับเงินรางวัล 70,000!`
+            });
+        } else {
+            // 💀 ตอบผิด: ผู้เล่นคนนั้นตาย และวาร์ปห้องหนี
+            const player = room.players.get(socket.id);
+            if (player) player.isAlive = false;
+
+            room.gameManager.relocateAnswerRoom();
+
+            socket.emit("turn_result", { status: "DIED", message: "คุณตอบผิด และวิญญาณของคุณถูกกักขัง..." });
+            io.to(roomId).emit("broadcast_message", `${player?.name} ตอบผิดและเสียชีวิตแล้ว! ห้องคำถามได้ย้ายที่ไปแล้ว...`);
+        }
+    });
+
+    socket.on('ready_for_next_turn', ({ roomId }) => {
+        const room = allRooms.get(roomId);
+        if (!room) return;
+
+        if (!readyPlayers.has(roomId)) {
+            readyPlayers.set(roomId, new Set());
+        }
+
+        const roomReadySet = readyPlayers.get(roomId)!;
+        roomReadySet.add(socket.id);
+
+        // เช็กว่าทุกคนกด Ready หรือยัง
+        const alivePlayers = Array.from(room.players.values());
+
+        console.log(`${roomReadySet.size} out of ${alivePlayers.length} players in room ${roomId} are ready for the next turn.`);
+
+        if (roomReadySet.size >= alivePlayers.length) {
+            // ล้างสถานะ Ready สำหรับเทิร์นถัดไป
+            readyPlayers.delete(roomId);
+
+            console.log(`All players in room ${roomId} are ready for the next turn. Starting next turn...`);
+
+            // 🚀 สั่งเริ่มเทิร์นถัดไปอย่างเป็นทางการ
+            io.to(roomId).emit('start_next_turn', {
+                turnNumber: room.turnManager.getTurnNumber(),
+                pendingPlayers: alivePlayers.map(p => p.name)
+            });
+
+            // อย่าลืมรีเซ็ต hasMoved ของทุกคนใน backend ด้วย
+            room.players.forEach(p => p.hasMoved = false);
+        } else {
+            // แจ้งเตือนคนอื่นๆ ว่ามีคน Ready เพิ่มขึ้น
+            io.to(roomId).emit('waiting_ready', {
+                readyCount: roomReadySet.size,
+                totalCount: alivePlayers.length
             });
         }
     });
